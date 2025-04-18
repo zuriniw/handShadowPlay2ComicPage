@@ -13,6 +13,7 @@ from mediapipe.tasks.python import vision
 # Import our gesture recognition module
 import gesture_recognition
 import hand_segmentation_helper as helper
+import keyframe_tracker
 
 def extract_hands_landmarks(image, hands):
     """
@@ -154,8 +155,53 @@ if __name__ == "__main__":
                         # Annotate the result image with gesture information
                         result_image = helper.annotate_image(image, handedness, landmarks, processed_results)
                         
-                        # Measure and display distance between characters if available
+                        # Get character IDs and keyframe tracker
                         character_ids = gesture_recognition.get_character_labels()
+                        kf_tracker = keyframe_tracker.get_keyframe_tracker()
+                        all_characters_history = gesture_recognition.get_all_characters_history()
+
+                        # Verify keyframes file periodically
+                        if time.time() % 10 < 1:  # Roughly every 10 seconds
+                            kf_tracker.verify_keyframes_file()
+
+                        # Check if there are any new characters to announce
+                        new_characters = gesture_recognition.get_new_characters_to_announce()
+                        if new_characters:
+                            # Force keyframe creation for each new character
+                            current_chars = set(character_ids.values())
+                            for new_char in new_characters:
+                                # Use the force method for add character events too
+                                print(f"Adding keyframe for new character: {new_char}")
+                                kf_tracker.add_keyframe_force(
+                                    f"add new character {new_char}",
+                                    current_chars,
+                                    all_characters_history
+                                )
+                                print(f"Keyframe added for new character: {new_char}")
+
+                        # Check if there are any characters that quit
+                        quit_characters = gesture_recognition.get_characters_that_quit()
+                        if quit_characters:
+                            # Force keyframe creation for each character that quit
+                            current_chars = set(character_ids.values())
+                            for quit_char in quit_characters:
+                                # Ensure we properly notify when adding quit keyframes
+                                print(f"Adding keyframe for quit character: {quit_char}")
+                                # Add the keyframe and bypass normal time restrictions
+                                kf_tracker.add_keyframe_force(
+                                    f"quit character {quit_char}",
+                                    current_chars,
+                                    all_characters_history
+                                )
+                                print(f"Keyframe added for quit character: {quit_char}")
+                        
+                        # Check for new keyframes
+                        any_hands_visible = len(handedness) > 0
+                        kf_tracker.check_terminate(any_hands_visible, all_characters_history)
+                        kf_tracker.check_character_changes(character_ids, all_characters_history)
+                        kf_tracker.check_distance(character_ids, handedness, landmarks, all_characters_history)
+                        
+                        # Measure and display distance between characters if available
                         result_image = helper.measure_character_distance(result_image, handedness, landmarks, character_ids)
                         
                         # Display debug visualization if enabled
@@ -183,6 +229,10 @@ if __name__ == "__main__":
                     elif key == ord('d'):  # Press 'd' to toggle debug visualization
                         debug_visualization = not debug_visualization
                         # print(f"Debug visualization: {'ON' if debug_visualization else 'OFF'}")
+                    elif key == ord('r'):  # Press 'r' to reset keyframes
+                        kf_tracker.reset_keyframes()
+                        gesture_recognition.reset_character_tracking()
+                        print("Keyframes reset. Press 'q' to quit.")
 
         except Exception as e:
             # print(f"❌ MediaPipe 模型載入或執行失敗: {str(e)}")

@@ -5,9 +5,16 @@ import os
 import sys
 import traceback
 import hashlib
+import json
+import time
+from datetime import datetime
+import math
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+
+# Import our keyframe tracking module
+import keyframe_tracker
 
 # Global variable to store current gesture results
 current_gesture_results = {"Left": None, "Right": None}  # "Left" and "Right" refer to handedness, not screen position
@@ -20,10 +27,26 @@ character_counter = {"snake": 1, "rabbit": 1}  # Start from 1 instead of 0
 identity_history = {"Left": None, "Right": None}
 # Keep a record of all characters that have ever appeared
 all_characters_history = set()
+# Keep track of characters that are new and need to be announced in keyframes
+new_characters_to_announce = set()
+# Keep track of characters that have quit and need to be announced in keyframes
+characters_that_quit = set()
+# Last frame's character set to detect quits
+previous_character_set = set()
+
+# KeyframeTracker class has been moved to keyframe_tracker.py
+
+# Function to access the keyframe tracker
+def get_keyframe_tracker():
+    return keyframe_tracker.get_keyframe_tracker()
 
 def process_result(result, output_image, timestamp_ms):
     processed_results = {"Left": None, "Right": None}  # Handedness-based
     seen_hands = set()
+    global new_characters_to_announce, characters_that_quit, previous_character_set
+    
+    # Remember the previous character set for quit detection
+    previous_values = set(character_ids.values())
 
     if result.gestures:
         for i, gesture in enumerate(result.gestures):
@@ -52,19 +75,41 @@ def process_result(result, output_image, timestamp_ms):
                 # Add to the complete history of all characters
                 global all_characters_history
                 all_characters_history.add(character_id)
+                # Mark this character as needing to be announced in keyframes
+                new_characters_to_announce.add(character_id)
+                print(f"New character detected: {character_id}")
                 character_counter[gesture_name] += 1
 
-    # Update only based on sticky labels
+    # Update based on sticky labels and track characters that disappeared
     for hand in ["Left", "Right"]:
         if hand in seen_hands:
             processed_results[hand] = sticky_labels[hand]
         else:
+            # Before clearing, check if this hand had a character that needs to be marked as quit
+            if hand in character_ids and character_ids[hand] in previous_values:
+                # A character has left the scene, mark it for a quit keyframe
+                quitting_character = character_ids[hand]
+                characters_that_quit.add(quitting_character)
+                print(f"Character quit detected: {quitting_character}")
+            
             # Hand is not visible anymore, clear its sticky label
             sticky_labels[hand] = None
             processed_results[hand] = None
             # Remove from current character mapping but keep the identity history
             character_ids.pop(hand, None)  # Don't reset identity history
 
+    # Check for characters that have disappeared between frames
+    current_values = set(character_ids.values())
+    if previous_character_set:
+        disappeared = previous_character_set - current_values
+        for char in disappeared:
+            if char not in characters_that_quit:  # Avoid duplicates
+                characters_that_quit.add(char)
+                print(f"Character quit detected (between frames): {char}")
+    
+    # Update previous character set
+    previous_character_set = current_values.copy()
+    
     global current_gesture_results
     current_gesture_results = processed_results
 
@@ -127,14 +172,60 @@ def get_all_characters_history():
     global all_characters_history
     return all_characters_history
 
+def get_new_characters_to_announce():
+    """Get and clear the list of new characters that need to be announced"""
+    global new_characters_to_announce
+    
+    # Safety check
+    if not isinstance(new_characters_to_announce, set):
+        print("WARNING: new_characters_to_announce is not a set! Resetting.")
+        new_characters_to_announce = set()
+        return set()
+    
+    # Make a copy first
+    new_chars = new_characters_to_announce.copy()
+    
+    if new_chars:
+        print(f"Returning {len(new_chars)} new characters: {new_chars}")
+    
+    # Only clear after successfully returning
+    new_characters_to_announce.clear()
+    return new_chars
+
+def get_characters_that_quit():
+    """Get and clear the list of characters that have quit and need to be announced"""
+    global characters_that_quit
+    
+    # Safety check to make sure we return something meaningful
+    if not isinstance(characters_that_quit, set):
+        print("WARNING: characters_that_quit is not a set! Resetting.")
+        characters_that_quit = set()
+        return set()
+        
+    # Make a copy to return, but don't clear until successful handling
+    quit_chars = characters_that_quit.copy()
+    
+    if quit_chars:
+        print(f"Returning {len(quit_chars)} characters that quit: {quit_chars}")
+    
+    # Only clear after returning
+    characters_that_quit.clear()
+    return quit_chars
+
 def reset_results():
-    global current_gesture_results, sticky_labels, character_ids, character_counter, identity_history, all_characters_history
+    global current_gesture_results, sticky_labels, character_ids, character_counter
+    global identity_history, all_characters_history, new_characters_to_announce
+    global characters_that_quit, previous_character_set
+    
     current_gesture_results = {"Left": None, "Right": None}
     sticky_labels = {"Left": None, "Right": None}
     character_ids = {}
     identity_history = {"Left": None, "Right": None}
     character_counter = {"snake": 1, "rabbit": 1}
     all_characters_history = set()
+    new_characters_to_announce = set()
+    characters_that_quit = set()
+    previous_character_set = set()
 
 def draw_labels_on_frame(frame, result):
     """將動物標籤顯示在畫面上對應的手部位置"""
@@ -183,3 +274,11 @@ def draw_labels_on_frame(frame, result):
             cv2.circle(frame, (x, y), 10, (0, 255, 0), -1)
 
     return frame
+
+def reset_character_tracking():
+    """Reset the character tracking when keyframes are reset"""
+    global previous_character_set, characters_that_quit
+    # We don't reset other variables as they're handled by reset_results
+    previous_character_set = set()
+    characters_that_quit = set()
+    print("Character quit tracking has been reset")
