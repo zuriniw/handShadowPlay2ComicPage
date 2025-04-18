@@ -124,6 +124,9 @@ if __name__ == "__main__":
                         if not ret:
                             # print("❌ 無法擷取畫面")
                             break
+                            
+                        # Flip the input image horizontally
+                        image = cv2.flip(image, 1)
 
                         # Get current timestamp for the frame
                         timestamp_ms = int(time.time() * 1000)
@@ -142,14 +145,6 @@ if __name__ == "__main__":
                         # Get the processed results from our module
                         processed_results = gesture_recognition.get_current_results()
 
-                        # Add animal labels to the output image for visualization
-                        if results and results.multi_hand_landmarks:
-                            # Create a compatible structure for draw_labels_on_frame
-                            adapted_results = type('', (), {})()
-                            adapted_results.hand_landmarks = results.multi_hand_landmarks
-                            adapted_results.handedness = results.multi_handedness
-                            out = gesture_recognition.draw_labels_on_frame(out, adapted_results)
-                        
                         # Process hand segmentation using helper
                         binary_output = helper.process_hand_segmentation(image, skeleton_binary, kernels)
                         
@@ -159,6 +154,10 @@ if __name__ == "__main__":
                         # Annotate the result image with gesture information
                         result_image = helper.annotate_image(image, handedness, landmarks, processed_results)
                         
+                        # Measure and display distance between characters if available
+                        character_ids = gesture_recognition.get_character_labels()
+                        result_image = helper.measure_character_distance(result_image, handedness, landmarks, character_ids)
+                        
                         # Display debug visualization if enabled
                         if debug_visualization and landmarks:
                             result_image = gesture_recognition.visualize_finger_state(result_image, landmarks)
@@ -166,6 +165,7 @@ if __name__ == "__main__":
                         # Combine info panel and result image
                         combined_image = np.vstack([result_image, info_panel])
                         
+                        # Since input image is already flipped, we don't need to flip outputs again
                         # Display processed images
                         cv2.imshow("Hand Detection", binary_output)
                         cv2.imshow("MediaPipe Output", out)

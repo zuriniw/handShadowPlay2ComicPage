@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 def prepare_morphology_kernels():
     """準備形態學操作所需的核心"""
@@ -140,20 +141,17 @@ def annotate_image(image, handedness, landmarks, processed_results):
             text_pos = hand_landmarks[0]
             gesture_text = processed_results.get(hand_type, None)
             
-            # Get character ID for this hand if available
-            char_id = character_ids.get(hand_type, identity_history.get(hand_type, ""))
-            
-            # Display only the character ID if available, otherwise show hand type
-            if char_id:
-                # Just show the character ID
-                annotation_text = char_id
+            # Display based on current recognized gesture state
+            if hand_type in character_ids and character_ids[hand_type]:
+                # Hand has a current character ID
+                annotation_text = character_ids[hand_type]
                 text_color = (0, 255, 255)  # Yellow for character labels
             elif gesture_text:
-                # If there's a gesture but no character ID
+                # Hand has a recognized gesture but no character ID yet
                 annotation_text = f"{hand_type}: {gesture_text}"
                 text_color = (0, 255, 0)  # Green for recognized gestures
             else:
-                # If no gesture is recognized
+                # Hand with no recognized gesture - just show handedness
                 annotation_text = f"{hand_type}"
                 text_color = (0, 0, 255)  # Red for unrecognized hands
             
@@ -166,4 +164,63 @@ def annotate_image(image, handedness, landmarks, processed_results):
                         text_color, 
                         1)  # Thinner line
     
-    return result_image 
+    return result_image
+
+def measure_character_distance(image, handedness, landmarks, character_ids):
+    """测量两个角色之间的距离并在图像上进行标注"""
+    # Make a copy of the input image
+    distance_image = image.copy()
+    
+    # If we don't have enough hands or character IDs, return the original image
+    if len(handedness) < 2 or len(landmarks) < 2 or len(character_ids) < 2:
+        return distance_image
+        
+    # Check if we have at least two characters with IDs
+    characters_with_ids = []
+    hand_landmarks = []
+    hand_types = []
+    
+    # Collect hands that have character IDs (use only current character_ids, not history)
+    for i, hand_type in enumerate(handedness):
+        if i < len(landmarks) and hand_type in character_ids and character_ids[hand_type]:
+            characters_with_ids.append(character_ids[hand_type])
+            hand_landmarks.append(landmarks[i])
+            hand_types.append(hand_type)
+    
+    # We need at least two hands with character IDs to measure distance
+    if len(characters_with_ids) < 2:
+        return distance_image
+    
+    # Get the first two hands with character IDs
+    char1 = characters_with_ids[0]
+    char2 = characters_with_ids[1]
+    hand1_wrist = hand_landmarks[0][0]  # First point is wrist
+    hand2_wrist = hand_landmarks[1][0]  # First point is wrist
+    
+    # Calculate Euclidean distance between the two wrists
+    distance = math.sqrt((hand1_wrist[0] - hand2_wrist[0])**2 + 
+                        (hand1_wrist[1] - hand2_wrist[1])**2)
+    
+    # Convert to pixel distance
+    distance_pixels = int(distance)
+    
+    # Draw a line connecting the two wrists
+    cv2.line(distance_image, hand1_wrist, hand2_wrist, (0, 255, 255), 2)
+    
+    # Calculate midpoint for text placement
+    mid_x = (hand1_wrist[0] + hand2_wrist[0]) // 2
+    mid_y = (hand1_wrist[1] + hand2_wrist[1]) // 2
+    
+    # Draw distance text at the midpoint
+    distance_text = f"Distance: {distance_pixels}px"
+    cv2.putText(distance_image, distance_text, 
+                (mid_x + 10, mid_y), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 1)
+    
+    # Draw character interaction text
+    interaction_text = f"{char1} <-> {char2}"
+    cv2.putText(distance_image, interaction_text, 
+                (mid_x + 10, mid_y - 25), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 1)
+    
+    return distance_image 
