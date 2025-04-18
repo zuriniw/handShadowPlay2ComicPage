@@ -201,6 +201,10 @@ if __name__ == "__main__":
                         kf_tracker.check_character_changes(character_ids, all_characters_history)
                         kf_tracker.check_distance(character_ids, handedness, landmarks, all_characters_history)
                         
+                        # Check if we've reached the 6 keyframe limit
+                        if kf_tracker.check_keyframe_limit():
+                            break
+                        
                         # Measure and display distance between characters if available
                         result_image = helper.measure_character_distance(result_image, handedness, landmarks, character_ids)
                         

@@ -136,7 +136,9 @@ def create_info_panel(image_width, processed_results):
     
     if kf_tracker.keyframes:
         latest_keyframe = kf_tracker.keyframes[-1]
-        keyframe_text = f"{latest_keyframe['time']} - {latest_keyframe['name']}"
+        # Use timestamp instead of time if time is not available
+        timestamp_str = latest_keyframe.get('time', str(latest_keyframe.get('timestamp', 0)))
+        keyframe_text = f"{timestamp_str} - {latest_keyframe['name']}"
         cv2.putText(info_panel, keyframe_text, 
                    (70, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 1)
     else:

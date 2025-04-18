@@ -26,8 +26,59 @@ class KeyframeTracker:
         self.prev_characters = set()  # Track previously seen characters
         self.announced_characters = set()  # Track characters that have already been announced
         
-        # Write empty keyframes file to start fresh
-        self.save_keyframes()
+        # Try to load existing keyframes if the file exists
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r') as f:
+                    file_data = json.load(f)
+                
+                # Handle both old and new formats
+                if isinstance(file_data, dict) and "keyframe_sequence" in file_data:
+                    # New format with keyframe_sequence and all_characters
+                    keyframe_sequence = file_data.get("keyframe_sequence", [])
+                    all_characters = file_data.get("all_characters", [])
+                    
+                    # Convert the simplified keyframes back to our internal format
+                    for kf in keyframe_sequence:
+                        # Create full keyframe with all required fields
+                        full_keyframe = {
+                            "timestamp": kf.get("timestamp", 0),
+                            "name": kf.get("name", ""),
+                            "current_characters": kf.get("current_characters", []),
+                            "all_characters": all_characters  # Use the global all_characters
+                        }
+                        self.keyframes.append(full_keyframe)
+                        
+                        # Track announced characters
+                        if full_keyframe["name"].startswith("add new character"):
+                            character_name = full_keyframe["name"].replace("add new character ", "").strip()
+                            self.announced_characters.add(character_name)
+                        elif full_keyframe["name"].startswith("from blank add a new animal:"):
+                            character_name = full_keyframe["name"].replace("from blank add a new animal:", "").strip()
+                            self.announced_characters.add(character_name)
+                elif isinstance(file_data, list):
+                    # Old format (directly a list of keyframes)
+                    self.keyframes = file_data
+                    
+                    # Track announced characters from loaded keyframes
+                    for kf in self.keyframes:
+                        if kf["name"].startswith("add new character"):
+                            character_name = kf["name"].replace("add new character ", "").strip()
+                            self.announced_characters.add(character_name)
+                        elif kf["name"].startswith("from blank add a new animal:"):
+                            character_name = kf["name"].replace("from blank add a new animal:", "").strip()
+                            self.announced_characters.add(character_name)
+                
+                print(f"Loaded {len(self.keyframes)} keyframes from {self.filename}")
+            except Exception as e:
+                print(f"Error loading keyframes from {self.filename}: {str(e)}")
+                traceback.print_exc()
+                # Start with empty keyframes
+                self.keyframes = []
+        
+        # Write empty keyframes file if we didn't load anything
+        if not self.keyframes:
+            self.save_keyframes()
     
     def get_elapsed_time(self):
         """Get elapsed time in seconds since tracker was created"""
@@ -48,14 +99,14 @@ class KeyframeTracker:
         
         # Create keyframe data
         timestamp = self.get_elapsed_time()
-        timestamp_str = datetime.now().strftime("%H:%M:%S")
+        timestamp_str = datetime.now().strftime("%H:%M:%S")  # Only used for console output
         
+        # Create simplified keyframe structure
         keyframe = {
             "timestamp": round(timestamp, 2),
-            "time": timestamp_str,
             "name": name,
             "current_characters": list(current_characters),
-            "all_characters": list(all_characters)
+            "all_characters": list(all_characters)  # Keep this for internal use
         }
         
         # Add to keyframes - insert in chronological order
@@ -75,10 +126,13 @@ class KeyframeTracker:
             character_name = name.replace("from blank add a new animal:", "").strip()
             self.announced_characters.add(character_name)
         
+        # Check if we've reached the keyframe limit
+        limit_result = self.check_keyframe_limit()
+        
         return True
     
     def save_keyframes(self):
-        """Save keyframes to JSON file"""
+        """Save keyframes to JSON file in a more concise format"""
         try:
             # Always ensure keyframes are sorted before saving
             self.keyframes.sort(key=lambda x: x.get('timestamp', 0))
@@ -87,9 +141,32 @@ class KeyframeTracker:
             if len(self.keyframes) > 0:
                 print(f"Saving {len(self.keyframes)} keyframes to {self.filename}")
                 
+                # Create a simplified version of keyframes - removing time and all_characters
+                simplified_keyframes = []
+                
+                # Get all_characters from the last keyframe if available
+                all_characters = []
+                if self.keyframes:
+                    all_characters = self.keyframes[-1].get('all_characters', [])
+                
+                # Create simplified version of each keyframe
+                for kf in self.keyframes:
+                    simplified_kf = {
+                        "timestamp": kf.get('timestamp', 0),
+                        "name": kf.get('name', ''),
+                        "current_characters": kf.get('current_characters', [])
+                    }
+                    simplified_keyframes.append(simplified_kf)
+                
+                # Create the new structure with keyframe_sequence and all_characters
+                output_data = {
+                    "keyframe_sequence": simplified_keyframes,
+                    "all_characters": all_characters
+                }
+                
                 # Use more robust saving approach with flush to ensure data is written
                 with open(self.filename, 'w') as f:
-                    json.dump(self.keyframes, f, indent=2)
+                    json.dump(output_data, f, indent=2)
                     f.flush()
                     os.fsync(f.fileno())  # Force OS to write to disk
                     
@@ -100,9 +177,13 @@ class KeyframeTracker:
                 else:
                     print(f"Warning: File {self.filename} doesn't exist after save attempt")
             else:
-                # Just create an empty array in the file
+                # Just create an empty JSON structure
+                empty_data = {
+                    "keyframe_sequence": [],
+                    "all_characters": []
+                }
                 with open(self.filename, 'w') as f:
-                    json.dump([], f)
+                    json.dump(empty_data, f, indent=2)
                     f.flush()
                     os.fsync(f.fileno())
                     
@@ -213,12 +294,12 @@ class KeyframeTracker:
         current_distance_state = None
         current_chars = set(character_ids.values())
 
-        if distance < 320:
+        if distance < 260:
             current_distance_state = "close"
             name = f"close enough {char1} <-> {char2}"
             if self.last_distance_state != "close" and should_add_keyframe(name):
                 self.add_keyframe(name, current_chars, all_characters_history)
-        elif distance > 550:
+        elif distance > 580:
             current_distance_state = "far"
             name = f"far enough {char1} <-> {char2}"
             if self.last_distance_state != "far" and should_add_keyframe(name):
@@ -238,14 +319,14 @@ class KeyframeTracker:
         
         # Create keyframe data
         timestamp = self.get_elapsed_time()
-        timestamp_str = datetime.now().strftime("%H:%M:%S")
+        timestamp_str = datetime.now().strftime("%H:%M:%S")  # Only used for console output
         
+        # Create simplified keyframe structure
         keyframe = {
             "timestamp": round(timestamp, 2),
-            "time": timestamp_str,
             "name": name,
             "current_characters": list(current_characters),
-            "all_characters": list(all_characters)
+            "all_characters": list(all_characters)  # Keep this for internal use
         }
         
         # Add to keyframes - insert in chronological order
@@ -268,8 +349,23 @@ class KeyframeTracker:
             character_name = name.replace("from blank add a new animal:", "").strip()
             self.announced_characters.add(character_name)
         
+        # Check if we've reached the keyframe limit
+        limit_result = self.check_keyframe_limit()
+        
         return True
 
+    def check_keyframe_limit(self):
+        """Check if the number of keyframes has reached or exceeded 6.
+        If so, return True to indicate the program should terminate.
+        """
+        if len(self.keyframes) >= 6:
+            print("\n==================================")
+            print("Thanks for playing!")
+            print("6 keyframes have been recorded, terminating the program.")
+            print("==================================\n")
+            return True
+        return False
+        
     def verify_keyframes_file(self):
         """Verify the keyframes file exists and contains the correct data"""
         try:
@@ -282,20 +378,41 @@ class KeyframeTracker:
             with open(self.filename, 'r') as f:
                 file_data = json.load(f)
             
-            # Check if the data matches what we expect
-            if len(file_data) != len(self.keyframes):
-                print(f"WARNING: File contains {len(file_data)} keyframes but memory has {len(self.keyframes)}")
+            # Check if the data has the correct structure
+            if not isinstance(file_data, dict) or "keyframe_sequence" not in file_data:
+                print(f"WARNING: File structure is incorrect, missing keyframe_sequence")
+                self.save_keyframes()
+                return False
+                
+            # Get the keyframe sequence and all_characters
+            keyframe_sequence = file_data.get("keyframe_sequence", [])
+            all_characters = file_data.get("all_characters", [])
+            
+            # Check if the count matches what we expect
+            if len(keyframe_sequence) != len(self.keyframes):
+                print(f"WARNING: File contains {len(keyframe_sequence)} keyframes but memory has {len(self.keyframes)}")
                 # Force a save to correct it
                 self.save_keyframes()
                 return False
             
-            # Count event types for verification
-            add_events = [kf for kf in file_data if kf['name'].startswith('add new character')]
-            quit_events = [kf for kf in file_data if kf['name'].startswith('quit character')]
-            close_events = [kf for kf in file_data if 'close enough' in kf['name']]
-            far_events = [kf for kf in file_data if 'far enough' in kf['name']]
+            # Ensure our in-memory keyframes are consistent with the file
+            # This shouldn't normally be necessary, but helps recover from file/memory mismatches
+            if len(keyframe_sequence) > 0 and len(self.keyframes) > 0:
+                # Compare timestamps and names to ensure consistency
+                file_timestamps = [kf.get('timestamp', 0) for kf in keyframe_sequence]
+                memory_timestamps = [kf.get('timestamp', 0) for kf in self.keyframes]
+                
+                if file_timestamps != memory_timestamps:
+                    print("WARNING: Keyframe timestamps in file don't match memory")
+                    self.save_keyframes()
+                    return False
             
-           
+            # Count event types for verification
+            add_events = [kf for kf in keyframe_sequence if kf['name'].startswith('add new character')]
+            quit_events = [kf for kf in keyframe_sequence if kf['name'].startswith('quit character')]
+            close_events = [kf for kf in keyframe_sequence if 'close enough' in kf['name']]
+            far_events = [kf for kf in keyframe_sequence if 'far enough' in kf['name']]
+            
             return True
         except Exception as e:
             print(f"Error verifying keyframes file: {str(e)}")
