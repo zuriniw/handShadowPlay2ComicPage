@@ -5,6 +5,22 @@ import math
 # Add keyframe_tracker import
 import keyframe_tracker
 
+# Global variable to track current background color
+# Format: (B, G, R)
+current_background_color = (255, 255, 255)  # Start with white background
+# List of background colors to cycle through - use more distinct colors
+background_colors = [
+    (255, 255, 255),  # White
+    (180, 180, 255),  # Light Red
+    (180, 255, 180),  # Light Green
+    (255, 180, 180),  # Light Blue
+    (180, 255, 255),  # Light Yellow
+    (255, 180, 255),  # Light Purple
+    (255, 255, 180),  # Light Cyan
+]
+# Index to keep track of which color to use next
+color_index = 0
+
 def prepare_morphology_kernels():
     """準備形態學操作所需的核心"""
     kernels = {
@@ -15,8 +31,18 @@ def prepare_morphology_kernels():
     }
     return kernels
 
+def change_background_color():
+    """Change the background color to the next one in the list"""
+    global color_index, current_background_color
+    color_index = (color_index + 1) % len(background_colors)
+    current_background_color = background_colors[color_index]
+    print(f"Changed background color to {current_background_color}")
+    return current_background_color
+
 def process_hand_segmentation(image, skeleton_binary, kernels):
     """處理手部分割"""
+    global current_background_color
+    
     # Stage 2: Get hand zone
     skeleton_binary = cv2.dilate(skeleton_binary, kernels['dilation_mask'], iterations=1)
     mask_s2 = cv2.dilate(skeleton_binary, kernels['dilation'], iterations=2)
@@ -29,8 +55,11 @@ def process_hand_segmentation(image, skeleton_binary, kernels):
     # Get hue, saturation and value values in previously selected pixels
     masked_hsv = np.where(mask_landmarks != 0)
     
-    # Create binary output
-    binary_output = np.ones_like(image) * 255  # Create white background
+    # Create binary output with the current background color
+    # Need to create the array with proper shape first
+    binary_output = np.ones_like(image, dtype=np.uint8)
+    # Apply the current background color to all pixels
+    binary_output[:,:] = current_background_color
     
     # Make sure we have detected hands before proceeding
     if len(masked_hsv[0]) > 0:
@@ -58,7 +87,7 @@ def process_hand_segmentation(image, skeleton_binary, kernels):
             mask_hsv = mask_hsv & cv2.cvtColor(mask_s2, cv2.COLOR_GRAY2RGB)
 
             # Set hand area to black in binary output
-            binary_output[mask_hsv[:,:,0] == 255] = 0  
+            binary_output[mask_hsv[:,:,0] == 255] = (0, 0, 0)
     
     return binary_output
 

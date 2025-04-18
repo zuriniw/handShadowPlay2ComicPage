@@ -119,6 +119,9 @@ if __name__ == "__main__":
                     recognizer.close()
                     sys.exit(1)
                 
+                # Store previous keyframe count to detect new keyframes
+                previous_keyframe_count = 0
+                
                 while cap.isOpened():
                     try:
                         ret, image = cap.read()
@@ -146,6 +149,20 @@ if __name__ == "__main__":
                         # Get the processed results from our module
                         processed_results = gesture_recognition.get_current_results()
 
+                        # Get character IDs and keyframe tracker before processing the hands
+                        # to ensure we have the latest keyframe state
+                        character_ids = gesture_recognition.get_character_labels()
+                        kf_tracker = keyframe_tracker.get_keyframe_tracker()
+                        all_characters_history = gesture_recognition.get_all_characters_history()
+
+                        # Check if a new keyframe has been added
+                        current_keyframe_count = len(kf_tracker.keyframes)
+                        if current_keyframe_count > previous_keyframe_count:
+                            # A new keyframe was added, change the background color
+                            helper.change_background_color()
+                            previous_keyframe_count = current_keyframe_count
+                            print(f"Keyframe count increased to {current_keyframe_count}, changed background color")
+
                         # Process hand segmentation using helper
                         binary_output = helper.process_hand_segmentation(image, skeleton_binary, kernels)
                         
@@ -155,11 +172,6 @@ if __name__ == "__main__":
                         # Annotate the result image with gesture information
                         result_image = helper.annotate_image(image, handedness, landmarks, processed_results)
                         
-                        # Get character IDs and keyframe tracker
-                        character_ids = gesture_recognition.get_character_labels()
-                        kf_tracker = keyframe_tracker.get_keyframe_tracker()
-                        all_characters_history = gesture_recognition.get_all_characters_history()
-
                         # Verify keyframes file periodically
                         if time.time() % 10 < 1:  # Roughly every 10 seconds
                             kf_tracker.verify_keyframes_file()
@@ -201,6 +213,13 @@ if __name__ == "__main__":
                         kf_tracker.check_character_changes(character_ids, all_characters_history)
                         kf_tracker.check_distance(character_ids, handedness, landmarks, all_characters_history)
                         
+                        # Update keyframe count if it changed during processing
+                        new_keyframe_count = len(kf_tracker.keyframes)
+                        if new_keyframe_count > current_keyframe_count:
+                            helper.change_background_color()
+                            previous_keyframe_count = new_keyframe_count
+                            print(f"Keyframe count increased to {new_keyframe_count} during processing, changed background color")
+                        
                         # Check if we've reached the 6 keyframe limit
                         if kf_tracker.check_keyframe_limit():
                             break
@@ -236,6 +255,10 @@ if __name__ == "__main__":
                     elif key == ord('r'):  # Press 'r' to reset keyframes
                         kf_tracker.reset_keyframes()
                         gesture_recognition.reset_character_tracking()
+                        # Reset background color index when resetting keyframes
+                        helper.color_index = 0
+                        helper.current_background_color = helper.background_colors[0]
+                        previous_keyframe_count = 0
                         print("Keyframes reset. Press 'q' to quit.")
 
         except Exception as e:
