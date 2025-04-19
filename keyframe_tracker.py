@@ -85,13 +85,59 @@ class KeyframeTracker:
         """Get elapsed time in seconds since tracker was created"""
         return time.time() - self.start_time
     
-    def send_socket_signal(self):
+    def send_socket_signal(self, current_characters, keyframe_name):
         """Send a signal to the socket server when a keyframe is added"""
         try:
+            # Create message based on number of characters
+            message = ""
+            num_chars = len(current_characters)
+            
+            # Check if this is a distance-related keyframe (far or close)
+            if "far enough" in keyframe_name:
+                # Extract animal names from keyframe name
+                # Format typically: "far enough animal1 <-> animal2"
+                parts = keyframe_name.replace("far enough ", "").split(" <-> ")
+                if len(parts) == 2:
+                    animal1, animal2 = parts
+                    message = f"there is a {animal1} on the left, and a {animal2} on the right, they are far apart"
+                else:
+                    # Fallback if parsing fails
+                    if num_chars == 2:
+                        left_animal = current_characters[0]
+                        right_animal = current_characters[1]
+                        message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right, they are far apart."
+            elif "close enough" in keyframe_name:
+                # Extract animal names from keyframe name
+                # Format typically: "close enough animal1 <-> animal2"
+                parts = keyframe_name.replace("close enough ", "").split(" <-> ")
+                if len(parts) == 2:
+                    animal1, animal2 = parts
+                    message = f"There is a black {animal1} on the left, and a black {animal2} on the right, they are close together."
+                else:
+                    # Fallback if parsing fails
+                    if num_chars == 2:
+                        left_animal = current_characters[0]
+                        right_animal = current_characters[1]
+                        message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right, they are close together."
+            else:
+                # Standard message format based on character count
+                if num_chars == 2:
+                    # Format: "there is a xx on the left, and a xx on the right"
+                    left_animal = current_characters[0]
+                    right_animal = current_characters[1]
+                    message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right."
+                elif num_chars == 1:
+                    # Format: "a single animaltype"
+                    animal = current_characters[0]
+                    message = f"There is a back {animal}."
+                else:
+                    # Format: "empty scene"
+                    message = "This is a peacefulempty scene."
+            
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(('127.0.0.1', 8000))
-                s.sendall(b"1")
-                print("Socket signal sent successfully")
+                s.sendall(message.encode('utf-8'))
+                print(f"Socket signal sent: '{message}'")
         except Exception as e:
             print(f"Error sending socket signal: {str(e)}")
             traceback.print_exc()
@@ -131,7 +177,7 @@ class KeyframeTracker:
         print(f"Keyframe recorded: {name} at {timestamp_str}")
         
         # Send socket signal after keyframe is saved
-        self.send_socket_signal()
+        self.send_socket_signal(list(current_characters), name)
         
         # If this is an "add new character" keyframe, mark the character as announced
         if name.startswith("add new character"):
@@ -229,7 +275,7 @@ class KeyframeTracker:
             return False
         
         # If no hands are visible for more than 5 seconds
-        if current_time - self.last_hand_seen_time > 5.0:
+        if current_time - self.last_hand_seen_time > 1000:
             # Add terminate keyframe
             self.add_keyframe("terminate", [], all_characters_history)
             # Reset timer after recording
@@ -357,7 +403,7 @@ class KeyframeTracker:
         print(f"Keyframe recorded: {name} at {timestamp_str}")
         
         # Send socket signal after keyframe is saved
-        self.send_socket_signal()
+        self.send_socket_signal(list(current_characters), name)
         
         # Track announced characters
         if name.startswith("add new character"):
