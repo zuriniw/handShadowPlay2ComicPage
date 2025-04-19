@@ -10,80 +10,74 @@ import keyframe_tracker
 current_background_color = (255, 255, 255)  # Start with white background
 # List of background colors to cycle through - use more distinct colors
 background_colors = [
-    (255, 255, 255),  # White
-    (180, 180, 255),  # Light Red
-    (180, 255, 180),  # Light Green
-    (255, 180, 180),  # Light Blue
-    (180, 255, 255),  # Light Yellow
-    (255, 180, 255),  # Light Purple
-    (255, 255, 180),  # Light Cyan
+    (141, 182, 182),  # 青石灰
+    (119, 160, 160),  # 雾蓝绿
+    (128, 179, 174),  # 冷调青
+    (144, 180, 123),  # 苔绿色
+    (174, 204, 110),  # 芥末绿
+    (184, 216, 144),  # 幼芽绿
+    (198, 224, 140),  # 草原浅绿
 ]
 # Index to keep track of which color to use next
 color_index = 0
 
-# Dictionary to store character-to-color mappings
-# Format: (B, G, R)
-character_colors = {
-    "cat": (0, 0, 0),     # Black for cat
-    "dog": (0, 0, 255),   # Red for dog
-    "rabbit": (0, 255, 0),  # Green for rabbit
-    "bird": (255, 0, 0),   # Blue for bird
-    "fox": (0, 255, 255),  # Yellow for fox
-    "mouse": (255, 0, 255), # Magenta for mouse
-    "bear": (255, 255, 0),  # Cyan for bear
-    "tiger": (128, 0, 0),   # Dark blue for tiger
-    "panda": (0, 128, 0),   # Dark green for panda
-    "monkey": (0, 0, 128),  # Dark red for monkey
-}
-
-# 存储每个具体角色的颜色
-# 例如 "rabbit 1", "rabbit 2" 将有不同的颜色
-character_specific_colors = {}
-
-# 预定义一组丰富的颜色，用于分配给不同的角色
-available_colors = [
-    (0, 0, 255),    # 红色
-    (0, 255, 0),    # 绿色
-    (255, 0, 0),    # 蓝色
-    (0, 255, 255),  # 黄色
-    (255, 0, 255),  # 洋红色
-    (255, 255, 0),  # 青色
-    (128, 0, 0),    # 深蓝色
-    (0, 128, 0),    # 深绿色
-    (0, 0, 128),    # 深红色
-    (128, 128, 0),  # 橄榄色
-    (128, 0, 128),  # 紫色
-    (0, 128, 128),  # 蓝绿色
-    (64, 0, 0),     # 暗蓝色
-    (0, 64, 0),     # 暗绿色
-    (0, 0, 64),     # 暗红色
-    (192, 0, 0),    # 亮蓝色
-    (0, 192, 0),    # 亮绿色
-    (0, 0, 192),    # 亮红色
-    (192, 192, 0),  # 亮黄色
-    (192, 0, 192),  # 亮紫色
-    (0, 192, 192),  # 亮蓝绿色
-    (32, 32, 32),   # 深灰色
-    (64, 64, 64),   # 中灰色
-    (128, 128, 128),# 灰色
-    (192, 192, 192),# 浅灰色
+# 为每种动物类型定义不同的色板
+# Rabbit色板：蓝色系
+rabbit_colors = [
+    (255, 182, 193),  # 粉红
+    (255, 218, 185),  # 桃子橘
+    (255, 228, 196),  # 浅杏仁
+    (255, 222, 173),  # 淡金色
+    (255, 192, 203),  # 樱花粉
 ]
 
-# 下一个要使用的颜色索引
-next_color_index = 0
+# Spider色板：红色系
+spider_colors = [
+    (178, 34, 34),     # 火焰红
+    (75, 0, 130),      # 靛蓝
+    (255, 140, 0),     # 暗橙色
+    (47, 79, 79),      # 深石板灰
+    (128, 0, 64),      # 暗莓红
+]
+
+# 存储每个具体角色的颜色
+character_specific_colors = {}
+
+# 为每种动物类型维护颜色索引
+animal_color_index = {
+    "rabbit": 0,
+    "spider": 0
+}
 
 def get_color_for_character(character_name):
-    """为角色获取或分配一个唯一的颜色"""
-    global character_specific_colors, next_color_index, available_colors
+    """为角色获取或分配一个唯一的颜色，基于动物类型选择色板"""
+    global character_specific_colors, animal_color_index
     
     # 如果角色已经有颜色，直接返回
     if character_name in character_specific_colors:
         return character_specific_colors[character_name]
     
-    # 分配一个新颜色
-    if next_color_index < len(available_colors):
-        color = available_colors[next_color_index]
-        next_color_index += 1
+    # 根据角色名称确定动物类型
+    animal_type = "rabbit"  # 默认为rabbit
+    character_lower = character_name.lower()
+    
+    if "spider" in character_lower:
+        animal_type = "spider"
+    
+    # 根据动物类型选择色板
+    if animal_type == "rabbit":
+        colors = rabbit_colors
+    else:  # spider
+        colors = spider_colors
+    
+    # 获取当前动物类型的颜色索引
+    color_idx = animal_color_index[animal_type]
+    
+    # 分配颜色
+    if color_idx < len(colors):
+        color = colors[color_idx]
+        # 更新索引，供下一个同类型角色使用
+        animal_color_index[animal_type] = (color_idx + 1) % len(colors)
     else:
         # 如果用完了所有颜色，生成一个随机颜色
         color = (
@@ -94,7 +88,7 @@ def get_color_for_character(character_name):
     
     # 存储这个角色的颜色
     character_specific_colors[character_name] = color
-    print(f"为角色 '{character_name}' 分配了新颜色 {color}")
+    print(f"为角色 '{character_name}' 分配了新颜色 {color}，使用了{animal_type}色板")
     
     return color
 
@@ -184,7 +178,7 @@ def process_hand_segmentation(image, skeleton_binary, kernels, handedness=None, 
                 start_point, 
                 end_point, 
                 color, 
-                thickness=40  # 增加线条粗细
+                thickness=60  # 增加线条粗细
             )
         
         # 绘制关键点 - 也稍微增大

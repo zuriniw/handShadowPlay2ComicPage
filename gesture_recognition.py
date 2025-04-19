@@ -22,7 +22,7 @@ current_gesture_results = {"Left": None, "Right": None}  # "Left" and "Right" re
 sticky_labels = {"Left": None, "Right": None}
 # Character identity mapping
 character_ids = {}
-character_counter = {"snake": 1, "rabbit": 1}  # Start from 1 instead of 0
+character_counter = {"spider": 1, "rabbit": 1}  # Start from 1 instead of 0
 # Track assigned identities even after detachment
 identity_history = {"Left": None, "Right": None}
 # Keep a record of all characters that have ever appeared
@@ -58,7 +58,7 @@ def process_result(result, output_image, timestamp_ms):
             gesture_name = top_gesture.category_name.lower()
 
             if gesture_name in ["closed_fist", "fist"]:
-                gesture_name = "snake"
+                gesture_name = "spider"
             elif gesture_name in ["victory", "peace"]:
                 gesture_name = "rabbit"
             elif gesture_name in ["open_palm", "open_hand"]:
@@ -67,7 +67,7 @@ def process_result(result, output_image, timestamp_ms):
                 gesture_name = None  # Ignore all other gestures
 
             # Stickiness logic with independent identity tracking
-            if sticky_labels[flipped_handedness] is None and gesture_name in ["snake", "rabbit"]:
+            if sticky_labels[flipped_handedness] is None and gesture_name in ["spider", "rabbit"]:
                 sticky_labels[flipped_handedness] = gesture_name
                 character_id = f"{gesture_name} {character_counter[gesture_name]}"
                 character_ids[flipped_handedness] = character_id
@@ -221,7 +221,7 @@ def reset_results():
     sticky_labels = {"Left": None, "Right": None}
     character_ids = {}
     identity_history = {"Left": None, "Right": None}
-    character_counter = {"snake": 1, "rabbit": 1}
+    character_counter = {"spider": 1, "rabbit": 1}
     all_characters_history = set()
     new_characters_to_announce = set()
     characters_that_quit = set()

@@ -15,6 +15,29 @@ import gesture_recognition
 import hand_segmentation_helper as helper
 import keyframe_tracker
 
+def make_square(image):
+    """
+    Create a square image by padding the original image with black borders
+    """
+    h, w = image.shape[:2]
+    size = max(h, w)
+    
+    # Create a black square
+    square = np.zeros((size, size, 3), dtype=np.uint8)
+    
+    # Calculate offsets to center the original image
+    y_offset = (size - h) // 2
+    x_offset = (size - w) // 2
+    
+    # Place the original image in the center of the square
+    if len(image.shape) == 3:
+        square[y_offset:y_offset+h, x_offset:x_offset+w] = image
+    else:
+        # Convert grayscale to BGR if needed
+        square[y_offset:y_offset+h, x_offset:x_offset+w] = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        
+    return square
+
 def extract_hands_landmarks(image, hands):
     """
     Extract hand landmarks and information from an image using regular MediaPipe Hands
@@ -237,18 +260,23 @@ if __name__ == "__main__":
                         # Combine info panel and result image
                         combined_image = np.vstack([result_image, info_panel])
                         
+                        # Make all display windows square
+                        square_binary_output = make_square(binary_output)
+                        square_out = make_square(out)
+                        square_combined_image = make_square(combined_image)
+                        
                         # Since input image is already flipped, we don't need to flip outputs again
                         # Display processed images
                         # If keyframe limit reached, show black screen for Hand Detection
                         if kf_tracker.is_limit_reached():
                             # Create a black image with same dimensions as binary_output
-                            black_screen = np.zeros_like(binary_output)
+                            black_screen = np.zeros_like(square_binary_output)
                             cv2.imshow("Hand Detection", black_screen)
                         else:
-                            cv2.imshow("Hand Detection", binary_output)
+                            cv2.imshow("Hand Detection", square_binary_output)
                         
-                        cv2.imshow("MediaPipe Output", out)
-                        cv2.imshow("Gesture Recognition", combined_image)
+                        cv2.imshow("MediaPipe Output", square_out)
+                        cv2.imshow("Gesture Recognition", square_combined_image)
 
                     except Exception as e:
                         # print(f"❌ 處理畫面時發生錯誤: {str(e)}")

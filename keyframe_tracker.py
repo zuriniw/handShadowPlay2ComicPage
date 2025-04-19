@@ -107,40 +107,44 @@ class KeyframeTracker:
                 parts = keyframe_name.replace("far enough ", "").split(" <-> ")
                 if len(parts) == 2:
                     animal1, animal2 = parts
+                    animal1 = animal1[:-2]
+                    animal2 = animal2[:-2]
                     message = f"there is a {animal1} on the left, and a {animal2} on the right, they are far apart"
                 else:
                     # Fallback if parsing fails
                     if num_chars == 2:
-                        left_animal = current_characters[0]
-                        right_animal = current_characters[1]
-                        message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right, they are far apart."
+                        left_animal = current_characters[0][:-2]
+                        right_animal = current_characters[1][:-2]
+                        message = f"There is a {left_animal} on the left, and a{right_animal} on the right, they are far apart."
             elif "close enough" in keyframe_name:
                 # Extract animal names from keyframe name
                 # Format typically: "close enough animal1 <-> animal2"
                 parts = keyframe_name.replace("close enough ", "").split(" <-> ")
                 if len(parts) == 2:
                     animal1, animal2 = parts
-                    message = f"There is a black {animal1} on the left, and a black {animal2} on the right, they are close together."
+                    animal1 = animal1[:-2]
+                    animal2 = animal2[:-2]
+                    message = f"There is a {animal1} on the left, and a {animal2} on the right, they are close together."
                 else:
                     # Fallback if parsing fails
                     if num_chars == 2:
-                        left_animal = current_characters[0]
-                        right_animal = current_characters[1]
-                        message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right, they are close together."
+                        left_animal = current_characters[0][:-2]
+                        right_animal = current_characters[1][:-2]
+                        message = f"There is a {left_animal} on the left, and a {right_animal} on the right, they are close together."
             else:
                 # Standard message format based on character count
                 if num_chars == 2:
                     # Format: "there is a xx on the left, and a xx on the right"
-                    left_animal = current_characters[0]
-                    right_animal = current_characters[1]
-                    message = f"There is a black {left_animal} on the left, and a black {right_animal} on the right."
+                    left_animal = current_characters[0][:-2]
+                    right_animal = current_characters[1][:-2]
+                    message = f"There is a {left_animal} on the left, and a {right_animal} on the right."
                 elif num_chars == 1:
                     # Format: "a single animaltype"
-                    animal = current_characters[0]
-                    message = f"There is a back {animal}."
+                    animal = current_characters[0][:-2]
+                    message = f"There is a {animal}."
                 else:
                     # Format: "empty scene"
-                    message = "This is a peacefulempty scene."
+                    message = "This is a peaceful empty scene."
             
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(('127.0.0.1', 8000))
@@ -373,12 +377,12 @@ class KeyframeTracker:
         current_distance_state = None
         current_chars = set(character_ids.values())
 
-        if distance < 260:
+        if distance < 250:
             current_distance_state = "close"
             name = f"close enough {char1} <-> {char2}"
             if self.last_distance_state != "close" and should_add_keyframe(name):
                 self.add_keyframe(name, current_chars, all_characters_history)
-        elif distance > 580:
+        elif distance > 650:
             current_distance_state = "far"
             name = f"far enough {char1} <-> {char2}"
             if self.last_distance_state != "far" and should_add_keyframe(name):
@@ -442,13 +446,13 @@ class KeyframeTracker:
         return True
 
     def check_keyframe_limit(self):
-        """Check if the number of keyframes has reached or exceeded 6.
+        """Check if the number of keyframes has reached or exceeded 7.
         If so, set the keyframe_limit_reached flag but don't terminate the program.
         """
-        if len(self.keyframes) >= 6:
+        if len(self.keyframes) >= 7:
             print("\n==================================")
             print("Thanks for playing!")
-            print("6 keyframes have been recorded")
+            print("7 keyframes have been recorded")
             print("No more keyframes will be recorded or sent")
             print("==================================\n")
             self.keyframe_limit_reached = True
