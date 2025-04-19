@@ -2,6 +2,7 @@ import os
 import time
 import json
 import math
+import socket
 from datetime import datetime
 import traceback
 
@@ -84,6 +85,17 @@ class KeyframeTracker:
         """Get elapsed time in seconds since tracker was created"""
         return time.time() - self.start_time
     
+    def send_socket_signal(self):
+        """Send a signal to the socket server when a keyframe is added"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(('127.0.0.1', 8000))
+                s.sendall(b"1")
+                print("Socket signal sent successfully")
+        except Exception as e:
+            print(f"Error sending socket signal: {str(e)}")
+            traceback.print_exc()
+    
     def add_keyframe(self, name, current_characters, all_characters):
         """Add a new keyframe with the given information"""
         # Check if enough time has passed since last keyframe
@@ -117,6 +129,9 @@ class KeyframeTracker:
         self.last_keyframe_time = current_time
         self.save_keyframes()
         print(f"Keyframe recorded: {name} at {timestamp_str}")
+        
+        # Send socket signal after keyframe is saved
+        self.send_socket_signal()
         
         # If this is an "add new character" keyframe, mark the character as announced
         if name.startswith("add new character"):
@@ -340,6 +355,9 @@ class KeyframeTracker:
         # Save immediately
         self.save_keyframes()
         print(f"Keyframe recorded: {name} at {timestamp_str}")
+        
+        # Send socket signal after keyframe is saved
+        self.send_socket_signal()
         
         # Track announced characters
         if name.startswith("add new character"):
