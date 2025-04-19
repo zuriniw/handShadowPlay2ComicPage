@@ -27,6 +27,9 @@ class KeyframeTracker:
         self.prev_characters = set()  # Track previously seen characters
         self.announced_characters = set()  # Track characters that have already been announced
         
+        # Add flag to track if keyframe limit has been reached
+        self.keyframe_limit_reached = False
+        
         # Try to load existing keyframes if the file exists
         if os.path.exists(self.filename):
             try:
@@ -87,6 +90,11 @@ class KeyframeTracker:
     
     def send_socket_signal(self, current_characters, keyframe_name):
         """Send a signal to the socket server when a keyframe is added"""
+        # Don't send signals if keyframe limit has been reached
+        if self.keyframe_limit_reached:
+            print("Keyframe limit reached, not sending socket signal")
+            return
+            
         try:
             # Create message based on number of characters
             message = ""
@@ -144,6 +152,11 @@ class KeyframeTracker:
     
     def add_keyframe(self, name, current_characters, all_characters):
         """Add a new keyframe with the given information"""
+        # Don't add keyframes if limit has been reached
+        if self.keyframe_limit_reached:
+            print("Keyframe limit reached, not adding new keyframe")
+            return False
+        
         # Check if enough time has passed since last keyframe
         current_time = time.time()
         if current_time - self.last_keyframe_time < self.min_time_between_keyframes:
@@ -194,6 +207,11 @@ class KeyframeTracker:
     
     def save_keyframes(self):
         """Save keyframes to JSON file in a more concise format"""
+        # Don't save if keyframe limit has been reached
+        if self.keyframe_limit_reached:
+            print("Keyframe limit reached, not saving keyframes")
+            return
+            
         try:
             # Always ensure keyframes are sorted before saving
             self.keyframes.sort(key=lambda x: x.get('timestamp', 0))
@@ -373,6 +391,11 @@ class KeyframeTracker:
         """Add a new keyframe with the given information, bypassing time restrictions.
         This is used for critical events like add and quit that must be recorded."""
         
+        # Don't add forced keyframes if limit has been reached
+        if self.keyframe_limit_reached:
+            print("Keyframe limit reached, not adding forced keyframe")
+            return False
+        
         # Check if this keyframe is a duplicate of the previous one
         if self.keyframes and self.keyframes[-1]['name'] == name:
             print(f"Skipping duplicate keyframe: {name}")
@@ -420,13 +443,15 @@ class KeyframeTracker:
 
     def check_keyframe_limit(self):
         """Check if the number of keyframes has reached or exceeded 6.
-        If so, return True to indicate the program should terminate.
+        If so, set the keyframe_limit_reached flag but don't terminate the program.
         """
         if len(self.keyframes) >= 6:
             print("\n==================================")
             print("Thanks for playing!")
-            print("6 keyframes have been recorded, terminating the program.")
+            print("6 keyframes have been recorded")
+            print("No more keyframes will be recorded or sent")
             print("==================================\n")
+            self.keyframe_limit_reached = True
             return True
         return False
         
@@ -482,6 +507,10 @@ class KeyframeTracker:
             print(f"Error verifying keyframes file: {str(e)}")
             traceback.print_exc()
             return False
+
+    def is_limit_reached(self):
+        """Return whether the keyframe limit has been reached"""
+        return self.keyframe_limit_reached
 
 # Create global keyframe tracker with timestamp in filename
 def create_keyframe_tracker():

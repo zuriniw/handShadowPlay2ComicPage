@@ -21,16 +21,6 @@ background_colors = [
 # Index to keep track of which color to use next
 color_index = 0
 
-def prepare_morphology_kernels():
-    """準備形態學操作所需的核心"""
-    kernels = {
-        'dilation': cv2.getStructuringElement(cv2.MORPH_RECT, (21, 21)),
-        'dilation_mask': cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)),
-        'closing': cv2.getStructuringElement(cv2.MORPH_RECT, (13, 13)),
-        'dilation2': cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-    }
-    return kernels
-
 def change_background_color():
     """Change the background color to the next one in the list"""
     global color_index, current_background_color
@@ -38,6 +28,20 @@ def change_background_color():
     current_background_color = background_colors[color_index]
     print(f"Changed background color to {current_background_color}")
     return current_background_color
+
+
+def prepare_morphology_kernels():
+    """準備形態學操作所需的核心"""
+    kernels = {
+        # 改用圆形或椭圆形结构元素，使边缘更圆润
+        'dilation': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)),
+        'dilation_mask': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        'closing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13)),
+        'dilation2': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)),
+        # 添加新的结构元素用于平滑处理
+        'smoothing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    }
+    return kernels
 
 def process_hand_segmentation(image, skeleton_binary, kernels):
     """處理手部分割"""
@@ -56,9 +60,7 @@ def process_hand_segmentation(image, skeleton_binary, kernels):
     masked_hsv = np.where(mask_landmarks != 0)
     
     # Create binary output with the current background color
-    # Need to create the array with proper shape first
     binary_output = np.ones_like(image, dtype=np.uint8)
-    # Apply the current background color to all pixels
     binary_output[:,:] = current_background_color
     
     # Make sure we have detected hands before proceeding
@@ -72,8 +74,9 @@ def process_hand_segmentation(image, skeleton_binary, kernels):
             q1s, q3s = np.percentile(np.random.choice(masked_sat, min(n_samples, len(masked_sat))), [25, 75])
             q1v, q3v = np.percentile(np.random.choice(masked_val, min(n_samples, len(masked_val))), [25, 75])
 
-            factors = 0.025
-            factorv = 0.025
+            # 扩大阈值范围以获取更完整的手部区域
+            factors = 0.03  # 增加为更宽容的阈值
+            factorv = 0.03
             mask_sat = cv2.inRange(hsv_image[:, :, 1], int(q1s * (1 - factors)), int(q3s * (1 + factors)))
             mask_val = cv2.inRange(hsv_image[:, :, 2], int(q1v * (1 - factorv)), int(q3v * (1 + factorv)))
             mask_hsv = (mask_sat & mask_val) | skeleton_binary
@@ -81,13 +84,25 @@ def process_hand_segmentation(image, skeleton_binary, kernels):
 
             mask_hsv |= cv2.cvtColor(skeleton_binary, cv2.COLOR_GRAY2RGB)
 
-            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_CLOSE, kernels['closing'], iterations=1)
+            # 增加闭运算次数，填充内部空隙
+            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_CLOSE, kernels['closing'], iterations=2)
+            # 开运算保留主要形状
             mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_OPEN, kernels['closing'], iterations=1)
+            # 膨胀操作
             mask_hsv = cv2.dilate(mask_hsv, kernels['dilation2'], iterations=1)
+            # 使用mask_s2约束区域
             mask_hsv = mask_hsv & cv2.cvtColor(mask_s2, cv2.COLOR_GRAY2RGB)
-
+            
+            # 额外平滑处理，使边缘更圆润
+            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_CLOSE, kernels['smoothing'], iterations=2)
+            
+            # 应用高斯模糊使边缘更平滑
+            mask_blur = cv2.GaussianBlur(mask_hsv, (5, 5), 0)
+            # 二值化恢复清晰边界
+            _, mask_blur = cv2.threshold(mask_blur, 127, 255, cv2.THRESH_BINARY)
+            
             # Set hand area to black in binary output
-            binary_output[mask_hsv[:,:,0] == 255] = (0, 0, 0)
+            binary_output[mask_blur[:,:,0] == 255] = (0, 0, 0)
     
     return binary_output
 

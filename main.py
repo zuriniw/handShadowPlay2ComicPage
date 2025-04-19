@@ -222,7 +222,9 @@ if __name__ == "__main__":
                         
                         # Check if we've reached the 6 keyframe limit
                         if kf_tracker.check_keyframe_limit():
-                            break
+                            # Instead of breaking, just set a flag to show black screen
+                            # but continue running the program
+                            pass
                         
                         # Measure and display distance between characters if available
                         result_image = helper.measure_character_distance(result_image, handedness, landmarks, character_ids)
@@ -236,7 +238,14 @@ if __name__ == "__main__":
                         
                         # Since input image is already flipped, we don't need to flip outputs again
                         # Display processed images
-                        cv2.imshow("Hand Detection", binary_output)
+                        # If keyframe limit reached, show black screen for Hand Detection
+                        if kf_tracker.is_limit_reached():
+                            # Create a black image with same dimensions as binary_output
+                            black_screen = np.zeros_like(binary_output)
+                            cv2.imshow("Hand Detection", black_screen)
+                        else:
+                            cv2.imshow("Hand Detection", binary_output)
+                        
                         cv2.imshow("MediaPipe Output", out)
                         cv2.imshow("Gesture Recognition", combined_image)
 
