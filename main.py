@@ -36,7 +36,7 @@ def extract_hands_landmarks(image, hands):
                 handedness_info = handedness.classification[0].label
                 handedness_list.append(handedness_info)
                 
-                # Store landmarks
+                # Store landmarks as pixel coordinates
                 hand_landmarks = []
                 for landmark in hand.landmark:
                     # Convert normalized coordinates to pixel coordinates
@@ -163,8 +163,9 @@ if __name__ == "__main__":
                             previous_keyframe_count = current_keyframe_count
                             print(f"Keyframe count increased to {current_keyframe_count}, changed background color")
 
-                        # Process hand segmentation using helper
-                        binary_output = helper.process_hand_segmentation(image, skeleton_binary, kernels)
+                        # Process hand segmentation using helper - pass handedness and character IDs
+                        # This will color each recognized character with a unique color, while unrecognized hands remain the same color as the background
+                        binary_output = helper.process_hand_segmentation(image, skeleton_binary, kernels, handedness, character_ids, landmarks)
                         
                         # Create info panel using helper
                         info_panel = helper.create_info_panel(image.shape[1], processed_results)

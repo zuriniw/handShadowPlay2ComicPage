@@ -21,6 +21,83 @@ background_colors = [
 # Index to keep track of which color to use next
 color_index = 0
 
+# Dictionary to store character-to-color mappings
+# Format: (B, G, R)
+character_colors = {
+    "cat": (0, 0, 0),     # Black for cat
+    "dog": (0, 0, 255),   # Red for dog
+    "rabbit": (0, 255, 0),  # Green for rabbit
+    "bird": (255, 0, 0),   # Blue for bird
+    "fox": (0, 255, 255),  # Yellow for fox
+    "mouse": (255, 0, 255), # Magenta for mouse
+    "bear": (255, 255, 0),  # Cyan for bear
+    "tiger": (128, 0, 0),   # Dark blue for tiger
+    "panda": (0, 128, 0),   # Dark green for panda
+    "monkey": (0, 0, 128),  # Dark red for monkey
+}
+
+# 存储每个具体角色的颜色
+# 例如 "rabbit 1", "rabbit 2" 将有不同的颜色
+character_specific_colors = {}
+
+# 预定义一组丰富的颜色，用于分配给不同的角色
+available_colors = [
+    (0, 0, 255),    # 红色
+    (0, 255, 0),    # 绿色
+    (255, 0, 0),    # 蓝色
+    (0, 255, 255),  # 黄色
+    (255, 0, 255),  # 洋红色
+    (255, 255, 0),  # 青色
+    (128, 0, 0),    # 深蓝色
+    (0, 128, 0),    # 深绿色
+    (0, 0, 128),    # 深红色
+    (128, 128, 0),  # 橄榄色
+    (128, 0, 128),  # 紫色
+    (0, 128, 128),  # 蓝绿色
+    (64, 0, 0),     # 暗蓝色
+    (0, 64, 0),     # 暗绿色
+    (0, 0, 64),     # 暗红色
+    (192, 0, 0),    # 亮蓝色
+    (0, 192, 0),    # 亮绿色
+    (0, 0, 192),    # 亮红色
+    (192, 192, 0),  # 亮黄色
+    (192, 0, 192),  # 亮紫色
+    (0, 192, 192),  # 亮蓝绿色
+    (32, 32, 32),   # 深灰色
+    (64, 64, 64),   # 中灰色
+    (128, 128, 128),# 灰色
+    (192, 192, 192),# 浅灰色
+]
+
+# 下一个要使用的颜色索引
+next_color_index = 0
+
+def get_color_for_character(character_name):
+    """为角色获取或分配一个唯一的颜色"""
+    global character_specific_colors, next_color_index, available_colors
+    
+    # 如果角色已经有颜色，直接返回
+    if character_name in character_specific_colors:
+        return character_specific_colors[character_name]
+    
+    # 分配一个新颜色
+    if next_color_index < len(available_colors):
+        color = available_colors[next_color_index]
+        next_color_index += 1
+    else:
+        # 如果用完了所有颜色，生成一个随机颜色
+        color = (
+            np.random.randint(0, 256),
+            np.random.randint(0, 256),
+            np.random.randint(0, 256)
+        )
+    
+    # 存储这个角色的颜色
+    character_specific_colors[character_name] = color
+    print(f"为角色 '{character_name}' 分配了新颜色 {color}")
+    
+    return color
+
 def change_background_color():
     """Change the background color to the next one in the list"""
     global color_index, current_background_color
@@ -35,74 +112,92 @@ def prepare_morphology_kernels():
     kernels = {
         # 改用圆形或椭圆形结构元素，使边缘更圆润
         'dilation': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)),
-        'dilation_mask': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        'dilation_mask': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
         'closing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13)),
-        'dilation2': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)),
+        'dilation2': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 710)),
         # 添加新的结构元素用于平滑处理
-        'smoothing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        'smoothing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
     }
     return kernels
 
-def process_hand_segmentation(image, skeleton_binary, kernels):
-    """處理手部分割"""
-    global current_background_color
+def process_hand_segmentation(image, skeleton_binary, kernels, handedness=None, character_ids=None, landmarks=None):
+    """處理手部分割，不再使用复杂掩码，直接绘制彩色骨骼
     
-    # Stage 2: Get hand zone
-    skeleton_binary = cv2.dilate(skeleton_binary, kernels['dilation_mask'], iterations=1)
-    mask_s2 = cv2.dilate(skeleton_binary, kernels['dilation'], iterations=2)
+    参数:
+        image: 输入图像
+        skeleton_binary: 二值骨骼图像 (不再使用)
+        kernels: 形态学操作的核心 (不再使用)
+        handedness: 手部类型列表 (左手/右手)
+        character_ids: 角色ID字典 {手部类型: 角色名称}
+        landmarks: 手部关键点列表
+    """
+    global current_background_color, character_specific_colors
     
-    # Convert image to LAB for hand segmentation
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
-
-    # Get boolean mask of interest pixels
-    mask_landmarks = skeleton_binary == 255
-    # Get hue, saturation and value values in previously selected pixels
-    masked_hsv = np.where(mask_landmarks != 0)
-    
-    # Create binary output with the current background color
+    # 创建纯色背景
     binary_output = np.ones_like(image, dtype=np.uint8)
     binary_output[:,:] = current_background_color
     
-    # Make sure we have detected hands before proceeding
-    if len(masked_hsv[0]) > 0:
-        masked_hue = hsv_image[:, :, 0][masked_hsv]
-        masked_sat = hsv_image[:, :, 1][masked_hsv]
-        masked_val = hsv_image[:, :, 2][masked_hsv]
-
-        n_samples = 150
-        if len(masked_sat) > 0 and len(masked_val) > 0:
-            q1s, q3s = np.percentile(np.random.choice(masked_sat, min(n_samples, len(masked_sat))), [25, 75])
-            q1v, q3v = np.percentile(np.random.choice(masked_val, min(n_samples, len(masked_val))), [25, 75])
-
-            # 扩大阈值范围以获取更完整的手部区域
-            factors = 0.03  # 增加为更宽容的阈值
-            factorv = 0.03
-            mask_sat = cv2.inRange(hsv_image[:, :, 1], int(q1s * (1 - factors)), int(q3s * (1 + factors)))
-            mask_val = cv2.inRange(hsv_image[:, :, 2], int(q1v * (1 - factorv)), int(q3v * (1 + factorv)))
-            mask_hsv = (mask_sat & mask_val) | skeleton_binary
-            mask_hsv = cv2.cvtColor(mask_hsv, cv2.COLOR_GRAY2RGB)
-
-            mask_hsv |= cv2.cvtColor(skeleton_binary, cv2.COLOR_GRAY2RGB)
-
-            # 增加闭运算次数，填充内部空隙
-            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_CLOSE, kernels['closing'], iterations=2)
-            # 开运算保留主要形状
-            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_OPEN, kernels['closing'], iterations=1)
-            # 膨胀操作
-            mask_hsv = cv2.dilate(mask_hsv, kernels['dilation2'], iterations=1)
-            # 使用mask_s2约束区域
-            mask_hsv = mask_hsv & cv2.cvtColor(mask_s2, cv2.COLOR_GRAY2RGB)
+    # 如果没有landmarks或handedness，直接返回纯背景
+    if not landmarks or not handedness or len(landmarks) == 0 or len(handedness) == 0:
+        return binary_output
+    
+    # 定义MediaPipe手部关键点连接
+    connections = [
+        (0, 1), (1, 2), (2, 3), (3, 4),  # 拇指
+        (0, 5), (5, 6), (6, 7), (7, 8),  # 食指
+        (0, 9), (9, 10), (10, 11), (11, 12),  # 中指
+        (0, 13), (13, 14), (14, 15), (15, 16),  # 无名指
+        (0, 17), (17, 18), (18, 19), (19, 20)  # 小指
+    ]
+    
+    # 遍历每只手
+    for i, (hand_type, hand_landmarks) in enumerate(zip(handedness, landmarks)):
+        if i >= len(landmarks):
+            continue
             
-            # 额外平滑处理，使边缘更圆润
-            mask_hsv = cv2.morphologyEx(mask_hsv, cv2.MORPH_CLOSE, kernels['smoothing'], iterations=2)
+        # 获取角色ID
+        character = character_ids.get(hand_type, "")
+        
+        # 为角色分配颜色
+        if character:
+            color = get_color_for_character(character)
+            print(f"将角色 '{character}' 的手部骨骼颜色设置为 {color}")
+        else:
+            # 默认黑色
+            color = (0, 0, 0)
+        
+        # 绘制手部关键点之间的连接线 - 增加线条粗细
+        for connection in connections:
+            start_idx, end_idx = connection
             
-            # 应用高斯模糊使边缘更平滑
-            mask_blur = cv2.GaussianBlur(mask_hsv, (5, 5), 0)
-            # 二值化恢复清晰边界
-            _, mask_blur = cv2.threshold(mask_blur, 127, 255, cv2.THRESH_BINARY)
+            # 确保索引在有效范围内
+            if start_idx >= len(hand_landmarks) or end_idx >= len(hand_landmarks):
+                continue
             
-            # Set hand area to black in binary output
-            binary_output[mask_blur[:,:,0] == 255] = (0, 0, 0)
+            # 获取关键点坐标
+            start_point = hand_landmarks[start_idx]
+            end_point = hand_landmarks[end_idx]
+            
+            # 绘制线条 - 增加线条粗细到5
+            cv2.line(
+                binary_output, 
+                start_point, 
+                end_point, 
+                color, 
+                thickness=40  # 增加线条粗细
+            )
+        
+        # 绘制关键点 - 也稍微增大
+        for landmark in hand_landmarks:
+            cv2.circle(
+                binary_output, 
+                landmark, 
+                radius=6,  # 稍微增大关键点半径
+                color=color, 
+                thickness=-1  # 填充圆
+            )
+        
+        # 移除角色标签文字
     
     return binary_output
 
