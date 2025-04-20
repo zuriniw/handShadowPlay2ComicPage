@@ -26,11 +26,11 @@ You will see three new windows pop up. These show what your camera sees and how 
 
 Open another command line, go to the folder where `test_connect_ani.py` is, and run it. You will see a new window called "image viewer." This shows the video that is being created.
 
-**Step 6:** Get the pictures for the comic page.
+**Step 6:** Get the materials for the comic page.
 
-To get the images for the comic page, you will need:
+To get the comic page, you will need:
 
-* The `json` file in this folder.
+* The `json` file in this folder. You can feed it into LLM to get the captions.
 * The pictures that were saved in the `screen/img` folder inside the `streamdiffusion` folder. These pictures are the "keypanels."
 
 
