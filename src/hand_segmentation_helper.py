@@ -21,8 +21,8 @@ background_colors = [
 # Index to keep track of which color to use next
 color_index = 0
 
-# 为每种动物类型定义不同的色板
-# Rabbit色板：蓝色系
+# Define different color palettes for each animal type
+# Rabbit palette: blue-based
 rabbit_colors = [
     (255, 182, 193),  # 粉红
     (255, 218, 185),  # 桃子橘
@@ -31,7 +31,7 @@ rabbit_colors = [
     (255, 192, 203),  # 樱花粉
 ]
 
-# Spider色板：红色系
+# Spider palette: red-based
 spider_colors = [
     (178, 34, 34),     # 火焰红
     (75, 0, 130),      # 靛蓝
@@ -40,55 +40,55 @@ spider_colors = [
     (128, 0, 64),      # 暗莓红
 ]
 
-# 存储每个具体角色的颜色
+# Store the color for each specific character
 character_specific_colors = {}
 
-# 为每种动物类型维护颜色索引
+# Maintain a color index for each animal type
 animal_color_index = {
     "rabbit": 0,
     "spider": 0
 }
 
 def get_color_for_character(character_name):
-    """为角色获取或分配一个唯一的颜色，基于动物类型选择色板"""
+    """Get or assign a unique color for the character based on the animal type"""
     global character_specific_colors, animal_color_index
     
-    # 如果角色已经有颜色，直接返回
+    # If the character already has a color, return it directly
     if character_name in character_specific_colors:
         return character_specific_colors[character_name]
     
-    # 根据角色名称确定动物类型
-    animal_type = "rabbit"  # 默认为rabbit
+    # Determine the animal type based on the character name
+    animal_type = "rabbit"  # Default to rabbit
     character_lower = character_name.lower()
     
     if "spider" in character_lower:
         animal_type = "spider"
     
-    # 根据动物类型选择色板
+    # Select the color palette based on the animal type
     if animal_type == "rabbit":
         colors = rabbit_colors
     else:  # spider
         colors = spider_colors
     
-    # 获取当前动物类型的颜色索引
+    # Get the current color index for the animal type
     color_idx = animal_color_index[animal_type]
     
-    # 分配颜色
+    # Assign a color
     if color_idx < len(colors):
         color = colors[color_idx]
-        # 更新索引，供下一个同类型角色使用
+        # Update the index, for use by the next character of the same type
         animal_color_index[animal_type] = (color_idx + 1) % len(colors)
     else:
-        # 如果用完了所有颜色，生成一个随机颜色
+        # If all colors are used, generate a random color
         color = (
             np.random.randint(0, 256),
             np.random.randint(0, 256),
             np.random.randint(0, 256)
         )
     
-    # 存储这个角色的颜色
+    # Store the color for this character
     character_specific_colors[character_name] = color
-    print(f"为角色 '{character_name}' 分配了新颜色 {color}，使用了{animal_type}色板")
+    print(f"Assigned new color {color} to character '{character_name}', using {animal_type} palette")
     
     return color
 
@@ -100,42 +100,18 @@ def change_background_color():
     print(f"Changed background color to {current_background_color}")
     return current_background_color
 
-
-def prepare_morphology_kernels():
-    """準備形態學操作所需的核心"""
-    kernels = {
-        # 改用圆形或椭圆形结构元素，使边缘更圆润
-        'dilation': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)),
-        'dilation_mask': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
-        'closing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13)),
-        'dilation2': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 710)),
-        # 添加新的结构元素用于平滑处理
-        'smoothing': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 8))
-    }
-    return kernels
-
-def process_hand_segmentation(image, skeleton_binary, kernels, handedness=None, character_ids=None, landmarks=None):
-    """處理手部分割，不再使用复杂掩码，直接绘制彩色骨骼
-    
-    参数:
-        image: 输入图像
-        skeleton_binary: 二值骨骼图像 (不再使用)
-        kernels: 形态学操作的核心 (不再使用)
-        handedness: 手部类型列表 (左手/右手)
-        character_ids: 角色ID字典 {手部类型: 角色名称}
-        landmarks: 手部关键点列表
-    """
+def process_hand_segmentation(image, handedness=None, character_ids=None, landmarks=None):
     global current_background_color, character_specific_colors
     
-    # 创建纯色背景
+    # Create a solid color background
     binary_output = np.ones_like(image, dtype=np.uint8)
     binary_output[:,:] = current_background_color
     
-    # 如果没有landmarks或handedness，直接返回纯背景
+    # If there are no landmarks or handedness, return the pure background
     if not landmarks or not handedness or len(landmarks) == 0 or len(handedness) == 0:
         return binary_output
     
-    # 定义MediaPipe手部关键点连接
+    # Define MediaPipe hand landmark connections
     connections = [
         (0, 1), (1, 2), (2, 3), (3, 4),  # 拇指
         (0, 5), (5, 6), (6, 7), (7, 8),  # 食指
@@ -144,59 +120,49 @@ def process_hand_segmentation(image, skeleton_binary, kernels, handedness=None, 
         (0, 17), (17, 18), (18, 19), (19, 20)  # 小指
     ]
     
-    # 遍历每只手
+    # Iterate through each hand
     for i, (hand_type, hand_landmarks) in enumerate(zip(handedness, landmarks)):
         if i >= len(landmarks):
             continue
-            
-        # 获取角色ID
+
         character = character_ids.get(hand_type, "")
-        
-        # 为角色分配颜色
+ 
         if character:
             color = get_color_for_character(character)
-            print(f"将角色 '{character}' 的手部骨骼颜色设置为 {color}")
+            print(f"Setting the hand bone color for character '{character}' to {color}")
         else:
-            # 默认黑色
             color = (0, 0, 0)
-        
-        # 绘制手部关键点之间的连接线 - 增加线条粗细
+
         for connection in connections:
             start_idx, end_idx = connection
-            
-            # 确保索引在有效范围内
+
             if start_idx >= len(hand_landmarks) or end_idx >= len(hand_landmarks):
                 continue
-            
-            # 获取关键点坐标
+
             start_point = hand_landmarks[start_idx]
             end_point = hand_landmarks[end_idx]
-            
-            # 绘制线条 - 增加线条粗细到5
+
             cv2.line(
                 binary_output, 
                 start_point, 
                 end_point, 
                 color, 
-                thickness=60  # 增加线条粗细
+                thickness=60  # Increase line thickness
             )
-        
-        # 绘制关键点 - 也稍微增大
+
         for landmark in hand_landmarks:
             cv2.circle(
                 binary_output, 
                 landmark, 
-                radius=6,  # 稍微增大关键点半径
+                radius=6, 
                 color=color, 
-                thickness=-1  # 填充圆
+                thickness=-1
             )
-        
-        # 移除角色标签文字
     
     return binary_output
 
 def create_info_panel(image_width, processed_results):
-    """創建資訊面板，显示当前场景中的动物角色和历史上出现过的所有角色"""
+    """Create an info panel to display the animal characters in the current scene and all characters that have appeared"""
     # Increase panel height to accommodate the character history and keyframe info
     info_panel_height = 210
     info_panel = np.ones((info_panel_height, image_width, 3), dtype=np.uint8) * 255
@@ -281,7 +247,7 @@ def create_info_panel(image_width, processed_results):
     return info_panel
 
 def annotate_image(image, handedness, landmarks, processed_results):
-    """在圖像上標注手部類型和手勢"""
+    """Annotate the image with hand type and gesture"""
     result_image = image.copy()
     
     # Import gesture recognition module to get character IDs
@@ -321,7 +287,7 @@ def annotate_image(image, handedness, landmarks, processed_results):
     return result_image
 
 def measure_character_distance(image, handedness, landmarks, character_ids):
-    """测量两个角色之间的距离并在图像上进行标注"""
+    """Measure the distance between two characters and annotate it on the image"""
     # Make a copy of the input image
     distance_image = image.copy()
     

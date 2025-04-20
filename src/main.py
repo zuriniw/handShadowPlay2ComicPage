@@ -106,9 +106,6 @@ if __name__ == "__main__":
             
         # print("✅ 成功啟用攝影機")
 
-        # Prepare kernels for morphological operations using helper
-        kernels = helper.prepare_morphology_kernels()
-
         # print("正在準備 MediaPipe 模型...")
         
         try:
@@ -188,7 +185,7 @@ if __name__ == "__main__":
 
                         # Process hand segmentation using helper - pass handedness and character IDs
                         # This will color each recognized character with a unique color, while unrecognized hands remain the same color as the background
-                        binary_output = helper.process_hand_segmentation(image, skeleton_binary, kernels, handedness, character_ids, landmarks)
+                        binary_output = helper.process_hand_segmentation(image, handedness=handedness, character_ids=character_ids, landmarks=landmarks)
                         
                         # Create info panel using helper
                         info_panel = helper.create_info_panel(image.shape[1], processed_results)

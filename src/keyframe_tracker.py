@@ -382,7 +382,7 @@ class KeyframeTracker:
             name = f"close enough {char1} <-> {char2}"
             if self.last_distance_state != "close" and should_add_keyframe(name):
                 self.add_keyframe(name, current_chars, all_characters_history)
-        elif distance > 650:
+        elif distance > 600:
             current_distance_state = "far"
             name = f"far enough {char1} <-> {char2}"
             if self.last_distance_state != "far" and should_add_keyframe(name):

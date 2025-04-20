@@ -2,14 +2,9 @@ import mediapipe as mp
 import cv2
 import numpy as np
 import os
-import sys
 import traceback
 import hashlib
-import json
-import time
 from datetime import datetime
-import math
-
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -122,7 +117,7 @@ def load_model():
             model_bytes = f.read()
         return model_bytes
     else:
-        print(f"❌ 找不到本地模型檔案: {local_model_path}")
+        print(f"❌ cannot find local model file: {local_model_path}")
         return None
 
 def create_recognizer():
@@ -133,11 +128,11 @@ def create_recognizer():
 
     model_bytes = load_model()
     if not model_bytes or len(model_bytes) < 1000:
-        print("❌ 模型資料無效或大小不足")
+        print("❌ model data is invalid or too small")
         return None
 
     model_hash = hashlib.md5(model_bytes).hexdigest()
-    print(f"✅ 模型檔案 MD5: {model_hash}")
+    print(f"✅ model file MD5: {model_hash}")
 
     options = GestureRecognizerOptions(
         base_options=BaseOptions(model_asset_buffer=model_bytes),
@@ -148,10 +143,10 @@ def create_recognizer():
 
     try:
         recognizer = GestureRecognizer.create_from_options(options)
-        print("✅ 成功建立手勢識別器")
+        print("✅ successfully created gesture recognizer")
         return recognizer
     except Exception as e:
-        print(f"❌ 無法創建手勢識別器: {str(e)}")
+        print(f"❌ cannot create gesture recognizer: {str(e)}")
         traceback.print_exc()
         return None
 
@@ -228,7 +223,7 @@ def reset_results():
     previous_character_set = set()
 
 def draw_labels_on_frame(frame, result):
-    """將動物標籤顯示在畫面上對應的手部位置"""
+    """Draw animal labels on the frame at the corresponding hand positions"""
     if not result.hand_landmarks:
         return frame
 
