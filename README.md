@@ -1,6 +1,6 @@
-# HandShadow2ComicPanel
+# HandShadowAnimal2ComicPanel
 
-*A Character-Aware Hand Shadow Play with Lasting + Printable Narratives*
+*A pipeline to turn Hand Shadow Animal Play to a Generative AI powered, character-aware storytelling.*
 
 ## Setup Instructions
 
@@ -33,17 +33,11 @@ To get the comic page, you will need:
 * The `json` file in this folder. You can feed it into LLM to get the captions.
 * The pictures that were saved in the `screen/img` folder inside the `streamdiffusion` folder. These pictures are the "keypanels."
 
-
-
-
-
 ## Description
 
 ### Concept
 
-Traditional hand shadow play is a cherished childhood memory, but it comes with inherent limitations. First, creative play can be difficult for children, as it’s hard to maintain precise hand shapes to represent specific animals—especially when performing various actions. Second, the experience is fleeting; memories of the play often fade quickly.
-
-This project reimagines hand shadow play as an engaging, collaborative, and easy-to-perform storytelling system that generates a printable comic page documenting the storylines formed during play. It detects hand gestures, classifies animal characters, and generates vivid six-panel comics to reflect the interaction.
+This project reimagines hand shadow animal play as an engaging, collaborative, and easy-to-perform narrative that generates a printable comic page documenting the storylines formed during play. It detects hand gestures, classifies animal characters, and generates vivid six-panel comics with captions.
 
 ### Input System
 
@@ -109,13 +103,7 @@ This project bridges physical interaction and generative AI to create a new form
 ## Tech & Tools
 
 - (legacy method for segmentation) ITAP Robotica Medica. Lightweight Hand Segmentation, GitHub Repository, 2024. [Online]. Available: https://github.com/itap-robotica-medica/lightweight-hand-segmentation/blob/main/hand_segmentation.py
-
 - Google. MediaPipe: Cross-platform, customizable ML solutions for live and streaming media, 2024. [Online]. Available: https://mediapipe.dev/
-
 - Cumulo-autumn. StreamDiffusion: Real-time Diffusion Image Generation Pipeline, GitHub Repository, 2024. [Online]. Available: https://github.com/cumulo-autumn/StreamDiffusion
-
 - Stability AI. SD-Turbo: High-speed Text-to-Image Generation Model, 2024. [Online]. Available: https://stability.ai/
-
 - Civitai. SDXL_CrayonPainting 2.0_2.0: Crayon-style Fine-tuned LoRA for SDXL, 2024. [Online]. Available: https://civitai.com/models/439493/crayonpaiting-sdxl-20-or
-
-
